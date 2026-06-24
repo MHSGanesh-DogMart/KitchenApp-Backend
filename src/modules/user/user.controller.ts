@@ -1,116 +1,73 @@
 import { Request, Response, NextFunction } from 'express';
+import * as cookService from '../../services/cookService';
+import * as cuisineService from '../../services/cuisineService';
+import { generateToken } from '../../auth';
 
-/**
- * Send OTP to user phone number.
- */
-export const sendOtp = async (req: Request, res: Response, next: NextFunction) => {
+/** Get public user profile (limited fields) */
+export const getUserProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { phone } = req.body;
-    if (!phone) {
-      return res.status(400).json({ success: false, message: 'Phone number is required' });
-    }
-    // Mock OTP logic
-    return res.status(200).json({
-      success: true,
-      message: `OTP sent successfully to ${phone}`,
-      data: { tempId: 'otp_temp_12345' }
-    });
+    const cook = await cookService.findCookById(req.params.id);
+    if (!cook) return res.status(404).json({ success: false, message: 'User not found' });
+    const { id, name, phone, tier } = cook;
+    return res.json({ success: true, data: { id, name, phone, tier } });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Verify OTP code.
- */
-export const verifyOtp = async (req: Request, res: Response, next: NextFunction) => {
+/** Update user profile (allowed fields) */
+export const updateUserProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { phone, code } = req.body;
-    if (!phone || !code) {
-      return res.status(400).json({ success: false, message: 'Phone and OTP code are required' });
-    }
-    // Mock validation
-    if (code !== '1234' && code !== '4321') {
-      return res.status(400).json({ success: false, message: 'Invalid OTP code' });
-    }
-    return res.status(200).json({
-      success: true,
-      message: 'OTP verified successfully',
-      data: {
-        token: 'mock_jwt_token_for_user_abc123',
-        user: {
-          id: 'user_01',
-          name: 'Jane Doe',
-          phone,
-          email: 'jane.doe@example.com',
-          coins: 50
-        }
-      }
-    });
+    const { id } = req.params;
+    const existing = await cookService.findCookById(id);
+    if (!existing) return res.status(404).json({ success: false, message: 'User not found' });
+    const updates = req.body;
+    const updated = { ...existing, ...updates } as any;
+    const saved = await cookService.upsertCook(updated);
+    return res.json({ success: true, data: saved });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Get current user profile.
- */
-export const getProfile = async (req: Request, res: Response, next: NextFunction) => {
+/** OTP Login for Customers / Users */
+export const userLogin = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    return res.status(200).json({
-      success: true,
-      data: {
-        id: 'user_01',
-        name: 'Jane Doe',
-        phone: '+919876543210',
-        email: 'jane.doe@example.com',
-        dob: '1995-08-12',
-        coins: 50,
-        savedAddresses: [
-          { id: 'addr_01', label: 'Home', line1: 'Madhapur', lat: 17.4483, lng: 78.3741, isDefault: true }
-        ]
-      }
-    });
+    const { phone, otp } = req.body;
+    if (!phone || !otp) {
+      return res.status(400).json({ success: false, message: 'Phone and OTP are required' });
+    }
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(phone)) {
+      return res.status(400).json({ success: false, message: 'Invalid phone format (must be 10 digits)' });
+    }
+    if (otp !== '1234') {
+      return res.status(401).json({ success: false, message: 'Invalid OTP' });
+    }
+    
+    // Check if the user (modeled in Cook schema for demo) exists, if not auto-create
+    let user = await cookService.findCookByPhone(phone);
+    if (!user) {
+      user = await cookService.createCook({
+        name: 'Padosi Customer',
+        phone: phone,
+        status: 'Active',
+        tier: 1,
+      });
+    }
+    
+    const token = generateToken(user.id, 'user');
+    return res.status(200).json({ success: true, token, user });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Get nearby verified home cooks.
- */
-export const getCooks = async (req: Request, res: Response, next: NextFunction) => {
+/** Get active cuisines list (public - for user/customer app) */
+export const getCuisines = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    return res.status(200).json({
-      success: true,
-      data: [
-        {
-          id: 'cook_01',
-          name: 'Aroma Kitchen (Chef Lakshmi)',
-          rating: 4.8,
-          tier: 'Tier 1',
-          distance: '1.2 km',
-          eta: '30-45 mins',
-          fssai: '23624003000124',
-          dishes: [
-            { id: 'dish_01', name: 'Hyderabadi Chicken Biryani Thali', price: 290, image: 'https://example.com/biryani.jpg', available: true },
-            { id: 'dish_02', name: 'Veg Meals Thali', price: 180, image: 'https://example.com/vegmeals.jpg', available: true }
-          ]
-        },
-        {
-          id: 'cook_02',
-          name: 'Pista House - Local Style (Chef Ahmed)',
-          rating: 4.6,
-          tier: 'Tier 2',
-          distance: '2.5 km',
-          eta: '35-50 mins',
-          fssai: '13621004000392',
-          dishes: [
-            { id: 'dish_03', name: 'Double Ka Meetha', price: 120, image: 'https://example.com/sweet.jpg', available: true }
-          ]
-        }
-      ]
-    });
+    const cuisines = await cuisineService.listCuisines(undefined, true);
+    return res.json({ success: true, data: cuisines });
   } catch (error) {
     next(error);
   }

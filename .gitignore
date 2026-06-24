@@ -3,3 +3,14 @@ dist/
 .env
 *.log
 .DS_Store
+
+/src/generated/prisma
+
+# Firebase service account credentials (NEVER commit these)
+*firebase*adminsdk*.json
+*-adminsdk-*.json
+serviceAccountKey.json
+
+# SQLite database file (local only)
+prisma/dev.db
+dev.db

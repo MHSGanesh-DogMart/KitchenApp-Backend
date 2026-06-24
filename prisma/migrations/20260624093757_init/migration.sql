@@ -1,0 +1,40 @@
+-- CreateTable
+CREATE TABLE "Cook" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT,
+    "name" TEXT NOT NULL,
+    "phone" TEXT NOT NULL,
+    "tier" INTEGER NOT NULL,
+    "status" TEXT NOT NULL,
+    "dob" TEXT,
+    "whatsapp" TEXT,
+    "altContact" TEXT,
+    "aadhaarNo" TEXT,
+    "panNo" TEXT,
+    "isVegOnly" BOOLEAN NOT NULL DEFAULT false,
+    "hasExistingFssai" BOOLEAN NOT NULL DEFAULT false,
+    "fssaiNumber" TEXT,
+    "fssaiExpiry" TEXT,
+    "lat" REAL,
+    "lng" REAL,
+    "meals" TEXT,
+    "capacity" INTEGER,
+    "cutoffNotice" TEXT,
+    "weeklyOff" TEXT,
+    "packagingType" TEXT,
+    "deliveryMode" TEXT,
+    "selfieUrl" TEXT,
+    "aadhaarUrl" TEXT,
+    "panUrl" TEXT,
+    "cookingUrl" TEXT,
+    "storageUrl" TEXT,
+    "sinkUrl" TEXT,
+    "fcmToken" TEXT,
+    "address" TEXT,
+    "appliedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Cook_phone_key" ON "Cook"("phone");
