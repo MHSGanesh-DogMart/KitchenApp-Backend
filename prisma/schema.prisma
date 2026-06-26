@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Cook {
@@ -94,4 +94,27 @@ model Cuisine {
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  MENU ITEM  (a dish belonging to a Cook / kitchen)
+// ─────────────────────────────────────────────────────────────────────────────
+model MenuItem {
+  id          String   @id @default(uuid())
+  cookId      String // owning kitchen (Cook.id, from the auth token)
+  name        String
+  price       Float
+  perDay      Int      @default(0) // quantity available per day
+  imageUrl    String?
+  diet        String   @default("Veg") // "Veg" | "Non-veg" | "Vegan" | "Jain"
+  spice       String   @default("Medium") // "Mild" | "Medium" | "Spicy" | "Extra spicy"
+  eggless     Boolean  @default(true)
+  portion     String?
+  ingredients String?
+  description String?
+  isAvailable Boolean  @default(true) // menu on / off
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([cookId])
 }

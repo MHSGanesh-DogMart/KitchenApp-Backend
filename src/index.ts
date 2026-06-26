@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import path from 'path';
 
 dotenv.config();
 
@@ -18,7 +19,11 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
+// Serve uploaded images as static files → /uploads/<filename>
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
 // Register module routes
+app.use('/api/admin', adminRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', kitchenRoutes);
 app.use('/api', userRoutes);

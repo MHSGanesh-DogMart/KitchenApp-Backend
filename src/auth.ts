@@ -10,7 +10,9 @@ const OTP_CODE = '1234'; // dummy OTP
 /** Generate JWT for a given user id and role */
 export function generateToken(userId: string, role: 'admin' | 'kitchen' | 'user'): string {
   const payload = { sub: userId, role };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
+  // Long-lived session for mobile partner/customer apps (30 days).
+  // Mobile users expect to stay logged in; on expiry they re-verify via OTP.
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
 }
 
 /** Verify JWT and attach user info to request */

@@ -2,6 +2,17 @@ import { Request, Response, NextFunction } from 'express';
 import * as cookService from '../../services/cookService';
 import * as cuisineService from '../../services/cuisineService';
 import { generateToken } from '../../auth';
+import multer from 'multer';
+import { uploadToFirebase, initFirebase } from '../../services/firebaseStorage';
+
+// Initialise Firebase Admin SDK at startup
+initFirebase();
+
+// ── Multer memory storage — accepts any field name the client sends ──────────
+export const multerUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB max
+}).any(); // Accepts: "file", "image", "banner", "photo", etc.
 
 /** Request OTP for kitchen users */
 export const sendOtp = async (req: Request, res: Response, next: NextFunction) => {
@@ -166,21 +177,50 @@ export const reapplyOnboarding = async (req: Request, res: Response, next: NextF
   }
 };
 
-/** Upload image/document attachment */
-export const upload = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // Return a mock fileUrl matching what Flutter expects
-    const mockFileUrl = 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600';
-    const mockFileName = `img_${Date.now()}.jpg`;
+/** Upload image/document attachment → Firebase Storage */
+export const upload = (req: Request, res: Response, next: NextFunction) => {
+  multerUpload(req, res, async (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ success: false, message: `Upload error: ${err.message}` });
+    }
+    if (err) {
+      return res.status(400).json({ success: false, message: 'File upload failed.' });
+    }
 
-    return res.json({
-      success: true,
-      fileName: mockFileName,
-      fileUrl: mockFileUrl
-    });
-  } catch (error) {
-    next(error);
-  }
+    // .any() puts files in req.files (array); grab the first one regardless of field name
+    const files = req.files as Express.Multer.File[] | undefined;
+    const uploadedFile = files && files.length > 0 ? files[0] : undefined;
+
+    if (!uploadedFile) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file received. Send the image as multipart/form-data (any field name).',
+      });
+    }
+
+    console.log(`[UPLOAD] Field: "${uploadedFile.fieldname}" | File: ${uploadedFile.originalname} | ${uploadedFile.size} bytes`);
+
+    try {
+      const fileUrl = await uploadToFirebase(
+        uploadedFile.buffer,
+        uploadedFile.originalname || 'upload.jpg',
+        uploadedFile.mimetype || 'image/jpeg',
+        'kitchen-uploads'
+      );
+
+      return res.json({
+        success: true,
+        fileName: uploadedFile.originalname,
+        fileUrl,
+      });
+    } catch (uploadErr: any) {
+      console.error('[UPLOAD ERROR]', uploadErr);
+      return res.status(500).json({
+        success: false,
+        message: uploadErr.message || 'Failed to upload file to Firebase Storage.',
+      });
+    }
+  });
 };
 
 /** Get the current cook status */

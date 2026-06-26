@@ -15,15 +15,11 @@ Express API backend written in TypeScript for the Padosi marketplace apps.
 
 ## Swagger Documentation
 - Local API Docs: `http://localhost:5000/api-docs`
-- Ngrok Public API Docs: `https://koala-wok-extruding.ngrok-free.dev/api-docs`
+- Production API Docs: `http://13.207.196.137/api-docs`
 
-## Ngrok Setup
-To expose this backend to the internet (for mobile and webhooks):
-1. Configure authtoken:
-   ```powershell
-   ngrok config add-authtoken <YOUR_TOKEN>
-   ```
-2. Start the tunnel:
-   ```powershell
-   ngrok http --url=koala-wok-extruding.ngrok-free.dev 5000
-   ```
+## Deployment (AWS EC2)
+The backend runs on an AWS EC2 instance (Ubuntu 24.04) behind nginx.
+- Public URL: `http://13.207.196.137`
+- Process manager: PM2 (`pm2 start dist/index.js --name padosi-api`)
+- Database: PostgreSQL (local to the instance) — see `DATABASE_URL` in `.env`
+- nginx reverse-proxies port 80 → Node app on port 5000

@@ -10,8 +10,8 @@ info:
   version: 1.0.0
   description: API documentation for Padosi Customer, Partner/Kitchen, and Admin apps.
 servers:
-  - url: https://koala-wok-extruding.ngrok-free.dev
-    description: Ngrok Tunnel server
+  - url: http://13.207.196.137
+    description: AWS production server
   - url: http://localhost:5000
     description: Local development server
 tags:
@@ -1003,6 +1003,168 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Cuisine'
+  /api/kitchen/menu:
+    get:
+      tags:
+        - Kitchen API
+      summary: Get all menu items for the authenticated kitchen
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of this kitchen's menu items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MenuItem'
+    post:
+      tags:
+        - Kitchen API
+      summary: Add a new menu item to the authenticated kitchen
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - price
+              properties:
+                name:
+                  type: string
+                  example: Veg Thali
+                price:
+                  type: number
+                  example: 120
+                perDay:
+                  type: integer
+                  example: 20
+                imageUrl:
+                  type: string
+                diet:
+                  type: string
+                  enum: [Veg, Non-veg, Vegan, Jain]
+                  example: Veg
+                spice:
+                  type: string
+                  enum: [Mild, Medium, Spicy, Extra spicy]
+                  example: Medium
+                eggless:
+                  type: boolean
+                  example: true
+                portion:
+                  type: string
+                  example: 2 roti + dal + sabzi + rice
+                ingredients:
+                  type: string
+                description:
+                  type: string
+                isAvailable:
+                  type: boolean
+                  example: true
+      responses:
+        '201':
+          description: Menu item created
+  /api/kitchen/menu/{id}:
+    put:
+      tags:
+        - Kitchen API
+      summary: Edit a menu item (must belong to the authenticated kitchen)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                price:
+                  type: number
+                perDay:
+                  type: integer
+                imageUrl:
+                  type: string
+                diet:
+                  type: string
+                  enum: [Veg, Non-veg, Vegan, Jain]
+                spice:
+                  type: string
+                  enum: [Mild, Medium, Spicy, Extra spicy]
+                eggless:
+                  type: boolean
+                portion:
+                  type: string
+                ingredients:
+                  type: string
+                description:
+                  type: string
+                isAvailable:
+                  type: boolean
+      responses:
+        '200':
+          description: Menu item updated
+    delete:
+      tags:
+        - Kitchen API
+      summary: Delete a menu item by id (must belong to the authenticated kitchen)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Menu item deleted
+  /api/kitchen/menu/{id}/availability:
+    patch:
+      tags:
+        - Kitchen API
+      summary: Turn a menu item ON or OFF (availability)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - isAvailable
+              properties:
+                isAvailable:
+                  type: boolean
+                  example: false
+      responses:
+        '200':
+          description: Availability updated
 components:
   schemas:
     Cuisine:
@@ -1020,6 +1182,43 @@ components:
           type: boolean
         sortOrder:
           type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    MenuItem:
+      type: object
+      properties:
+        id:
+          type: string
+        cookId:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+        perDay:
+          type: integer
+        imageUrl:
+          type: string
+        diet:
+          type: string
+          enum: [Veg, Non-veg, Vegan, Jain]
+        spice:
+          type: string
+          enum: [Mild, Medium, Spicy, Extra spicy]
+        eggless:
+          type: boolean
+        portion:
+          type: string
+        ingredients:
+          type: string
+        description:
+          type: string
+        isAvailable:
+          type: boolean
         createdAt:
           type: string
           format: date-time
