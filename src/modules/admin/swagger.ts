@@ -152,7 +152,7 @@ paths:
     get:
       tags:
         - User API
-      summary: List live kitchens (optional lat/lng for distance, optional cuisineId filter)
+      summary: List live kitchens (paginated; optional lat/lng + cuisineId)
       security:
         - bearerAuth: []
       parameters:
@@ -168,6 +168,16 @@ paths:
           in: query
           schema:
             type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
       responses:
         '200':
           description: Array of kitchens
@@ -215,7 +225,7 @@ paths:
     get:
       tags:
         - User API
-      summary: List all available dishes (optional cuisineId filter)
+      summary: List all available dishes (paginated; optional cuisineId)
       security:
         - bearerAuth: []
       parameters:
@@ -223,6 +233,16 @@ paths:
           in: query
           schema:
             type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
       responses:
         '200':
           description: Array of dishes (each with cookId + cookName)

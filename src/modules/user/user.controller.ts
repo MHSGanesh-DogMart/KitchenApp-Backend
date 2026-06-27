@@ -314,6 +314,19 @@ const parseLatLng = (req: Request) => ({
   lng: req.query.lng ? parseFloat(req.query.lng as string) : null,
 });
 
+/** Slice an already-sorted array into a page + meta. */
+function paginate<T>(items: T[], req: Request) {
+  const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+  const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string, 10) || 20));
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const start = (page - 1) * limit;
+  return {
+    data: items.slice(start, start + limit),
+    pagination: { page, limit, total, totalPages, hasMore: page < totalPages },
+  };
+}
+
 /** GET /api/user/kitchens — list live kitchens (lat/lng + optional cuisineId) */
 export const listKitchens = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -333,7 +346,8 @@ export const listKitchens = async (req: Request, res: Response, next: NextFuncti
     if (lat != null && lng != null) {
       cards.sort((a: any, b: any) => (a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9));
     }
-    return res.json({ success: true, data: cards });
+    const { data, pagination } = paginate(cards, req);
+    return res.json({ success: true, data, pagination });
   } catch (error) {
     next(error);
   }
@@ -383,10 +397,9 @@ export const listDishes = async (req: Request, res: Response, next: NextFunction
     }
     const cookMap = new Map(cooks.map((c: any) => [c.id, c]));
     const dishes = (await menuService.listAvailableMenus()).filter((d) => cookMap.has(d.cookId));
-    return res.json({
-      success: true,
-      data: dishes.map((d) => buildDishCard(d, cookMap.get(d.cookId))),
-    });
+    const cards = dishes.map((d) => buildDishCard(d, cookMap.get(d.cookId)));
+    const { data, pagination } = paginate(cards, req);
+    return res.json({ success: true, data, pagination });
   } catch (error) {
     next(error);
   }
