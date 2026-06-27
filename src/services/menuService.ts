@@ -22,6 +22,14 @@ export const listMenusByCook = async (cookId: string) => {
   });
 };
 
+/** Every available dish across all kitchens (for the customer home feed). */
+export const listAvailableMenus = async () => {
+  return prisma.menuItem.findMany({
+    where: { isAvailable: true },
+    orderBy: { createdAt: 'desc' },
+  });
+};
+
 export const findMenuById = async (id: string) => {
   return prisma.menuItem.findUnique({ where: { id } });
 };

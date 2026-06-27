@@ -32,14 +32,32 @@ export async function createUser(data: {
 
 export async function updateUser(
   id: string,
-  updates: { name?: string; email?: string; fcmToken?: string },
+  updates: {
+    name?: string;
+    email?: string;
+    dob?: string;
+    profilePicUrl?: string;
+    fcmToken?: string;
+  },
 ) {
-  const data: any = { ...updates };
-  if (updates.name) data.name = updates.name.trim();
+  const data: any = {};
+  if (updates.name !== undefined) data.name = updates.name.trim();
   if (updates.email !== undefined) data.email = updates.email?.trim() || null;
+  if (updates.dob !== undefined) data.dob = updates.dob || null;
+  if (updates.profilePicUrl !== undefined) data.profilePicUrl = updates.profilePicUrl || null;
+  if (updates.fcmToken !== undefined) data.fcmToken = updates.fcmToken;
   return prisma.user.update({ where: { id }, data });
 }
 
 export async function updateFcmToken(id: string, fcmToken: string) {
   return prisma.user.update({ where: { id }, data: { fcmToken } });
+}
+
+/** All customers, newest first (for the admin panel). */
+export async function listAllUsers() {
+  return prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
+}
+
+export async function countUsers() {
+  return prisma.user.count();
 }

@@ -85,6 +85,191 @@ paths:
       responses:
         '200':
           description: OTP verified — account created/logged in, returns token and user
+  /api/user/me:
+    get:
+      tags:
+        - User API
+      summary: Get the authenticated customer's own profile (id from token)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile retrieved
+    put:
+      tags:
+        - User API
+      summary: Update the authenticated customer's own profile (id from token)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                dob:
+                  type: string
+                  example: "1998-07-14"
+                profilePicUrl:
+                  type: string
+      responses:
+        '200':
+          description: Profile updated
+  /api/user/home:
+    get:
+      tags:
+        - User API
+      summary: Customer home feed — greeting name + nearby kitchens + today's menu, optional cuisine filter
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+          description: Customer latitude (required; sorts kitchens by distance)
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+          description: Customer longitude (required)
+        - name: cuisineId
+          in: query
+          schema:
+            type: string
+          description: Filter kitchens by cuisine (omit to show all)
+      responses:
+        '200':
+          description: Home feed — { cuisines, cooks, dishes }
+  /api/user/kitchens:
+    get:
+      tags:
+        - User API
+      summary: List live kitchens (optional lat/lng for distance, optional cuisineId filter)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: lat
+          in: query
+          schema:
+            type: number
+        - name: lng
+          in: query
+          schema:
+            type: number
+        - name: cuisineId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of kitchens
+  /api/user/kitchens/{id}:
+    get:
+      tags:
+        - User API
+      summary: Kitchen details by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: lat
+          in: query
+          schema:
+            type: number
+        - name: lng
+          in: query
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Kitchen details
+  /api/user/kitchens/{id}/menu:
+    get:
+      tags:
+        - User API
+      summary: A kitchen's available menu (dishes)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of available dishes for the kitchen
+  /api/user/dishes:
+    get:
+      tags:
+        - User API
+      summary: List all available dishes (optional cuisineId filter)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cuisineId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of dishes (each with cookId + cookName)
+  /api/user/dishes/{id}:
+    get:
+      tags:
+        - User API
+      summary: Dish details by id + recommended products
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Dish details with a "recommended" array
+  /api/user/upload:
+    post:
+      tags:
+        - User API
+      summary: Upload a customer profile image (multipart) → returns fileUrl
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Image uploaded — returns fileUrl
+  /api/admin/users:
+    get:
+      tags:
+        - Admin API
+      summary: List all customers (User table)
+      responses:
+        '200':
+          description: All customers
   /api/kitchen/auth/otp/send:
     post:
       tags:

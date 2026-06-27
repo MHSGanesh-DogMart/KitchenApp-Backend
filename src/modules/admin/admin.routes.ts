@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getDashboardStats,
   getPendingCooks,
+  getUsers,
   verifyCook,
   runPayoutCycle,
   adminLogin,
@@ -28,6 +29,10 @@ const router = Router();
 // Dashboard Stats & Onboarding Verification
 router.get('/dashboard/stats', getDashboardStats);
 router.get('/cooks/pending', getPendingCooks);
+
+// Customers (User table)
+router.get('/users', getUsers);
+router.get('/admin/users', getUsers);
 router.post('/cooks/:id/verify', verifyCook);
 router.post('/payouts/run', runPayoutCycle);
 

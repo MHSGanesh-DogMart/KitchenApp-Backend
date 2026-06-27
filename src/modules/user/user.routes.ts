@@ -8,13 +8,22 @@ const router = express.Router();
 router.post('/user/auth/otp/send', userCtrl.sendOtp);
 router.post('/user/auth/otp/verify', userCtrl.verifyOtp);
 
-// Public endpoint to fetch a user profile (no auth required for demo)
-router.get('/user/profile/:id', userCtrl.getUserProfile);
+// Customer's OWN profile — id comes from the token (no id in path)
+router.get('/user/me', verifyToken, userCtrl.getMyProfile);
+router.put('/user/me', verifyToken, userCtrl.updateMyProfile);
+router.post('/user/upload', verifyToken, userCtrl.uploadProfileImage);
 
 // Public cuisines list for customer app
 router.get('/user/cuisines', userCtrl.getCuisines);
 
-// Protected endpoint to update user profile
-router.put('/user/profile/:id', verifyToken, userCtrl.updateUserProfile);
+// Customer home feed (token required → returns greeting name; lat/lng + optional cuisineId)
+router.get('/user/home', verifyToken, userCtrl.getHome);
+
+// Browse kitchens & dishes (token required)
+router.get('/user/kitchens', verifyToken, userCtrl.listKitchens);
+router.get('/user/kitchens/:id', verifyToken, userCtrl.getKitchenById);
+router.get('/user/kitchens/:id/menu', verifyToken, userCtrl.getKitchenMenu);
+router.get('/user/dishes', verifyToken, userCtrl.listDishes);
+router.get('/user/dishes/:id', verifyToken, userCtrl.getDishById);
 
 export default router;

@@ -101,14 +101,16 @@ model Cuisine {
 //  User (customer) record and a Cook (kitchen) record; they are independent.
 // ─────────────────────────────────────────────────────────────────────────────
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String?
-  phone     String   @unique
-  fcmToken  String?
-  status    String   @default("Active") // "Active" | "Blocked"
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(uuid())
+  name          String
+  email         String?
+  phone         String   @unique
+  dob           String?
+  profilePicUrl String?
+  fcmToken      String?
+  status        String   @default("Active") // "Active" | "Blocked"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

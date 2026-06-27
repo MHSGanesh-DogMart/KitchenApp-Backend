@@ -3,6 +3,7 @@ import * as cookService from '../../services/cookService';
 import * as configService from '../../services/configService';
 import * as couponService from '../../services/couponService';
 import * as cuisineService from '../../services/cuisineService';
+import * as userService from '../../services/userService';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../../config';
 
@@ -54,6 +55,16 @@ export const getPendingCooks = async (_req: Request, res: Response, next: NextFu
   try {
     const pending = await cookService.getPendingCooks();
     return res.json({ success: true, data: pending });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** List all customers (User table) for the admin Customers page */
+export const getUsers = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const users = await userService.listAllUsers();
+    return res.json({ success: true, data: users });
   } catch (error) {
     next(error);
   }
