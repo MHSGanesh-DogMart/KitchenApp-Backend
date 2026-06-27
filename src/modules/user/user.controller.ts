@@ -1,63 +1,99 @@
 import { Request, Response, NextFunction } from 'express';
-import * as cookService from '../../services/cookService';
+import * as userService from '../../services/userService';
 import * as cuisineService from '../../services/cuisineService';
 import { generateToken } from '../../auth';
 
-/** Get public user profile (limited fields) */
+/** Get public customer profile (limited fields) */
 export const getUserProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const cook = await cookService.findCookById(req.params.id);
-    if (!cook) return res.status(404).json({ success: false, message: 'User not found' });
-    const { id, name, phone, tier } = cook;
-    return res.json({ success: true, data: { id, name, phone, tier } });
+    const user = await userService.findUserById(req.params.id as string);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    const { id, name, email, phone } = user;
+    return res.json({ success: true, data: { id, name, email, phone } });
   } catch (error) {
     next(error);
   }
 };
 
-/** Update user profile (allowed fields) */
+/** Update customer profile (name / email) */
 export const updateUserProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
-    const existing = await cookService.findCookById(id);
+    const id = req.params.id as string;
+    const existing = await userService.findUserById(id);
     if (!existing) return res.status(404).json({ success: false, message: 'User not found' });
-    const updates = req.body;
-    const updated = { ...existing, ...updates } as any;
-    const saved = await cookService.upsertCook(updated);
+    const { name, email, fcmToken } = req.body;
+    const saved = await userService.updateUser(id, { name, email, fcmToken });
     return res.json({ success: true, data: saved });
   } catch (error) {
     next(error);
   }
 };
 
-/** OTP Login for Customers / Users */
-export const userLogin = async (req: Request, res: Response, next: NextFunction) => {
+/** Request OTP for a customer (dummy code 1234) */
+export const sendOtp = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { phone, otp } = req.body;
-    if (!phone || !otp) {
-      return res.status(400).json({ success: false, message: 'Phone and OTP are required' });
+    const { mobileNumber, phone } = req.body;
+    const phoneNum = mobileNumber || phone;
+    if (!phoneNum) {
+      return res.status(400).json({ success: false, message: 'Mobile number is required' });
     }
-    const phoneRegex = /^\d{10}$/;
-    if (!phoneRegex.test(phone)) {
-      return res.status(400).json({ success: false, message: 'Invalid phone format (must be 10 digits)' });
+    console.log(`[OTP] Sent verification OTP code 1234 to customer: ${phoneNum}`);
+    return res.json({
+      success: true,
+      message: 'OTP sent successfully (Code: 1234)',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Verify customer OTP. On first verification the customer account is
+ * created from the supplied name + email. Returning customers just log in.
+ * This User record is independent of any Cook (kitchen) record on the same phone.
+ */
+export const verifyOtp = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { mobileNumber, phone, otp, code, fcmToken, name, email } = req.body;
+    const phoneNum = mobileNumber || phone;
+    const otpCode = otp || code;
+
+    if (!phoneNum || !otpCode) {
+      return res.status(400).json({ success: false, message: 'Mobile number and OTP code are required' });
     }
-    if (otp !== '1234') {
-      return res.status(401).json({ success: false, message: 'Invalid OTP' });
+    if (otpCode !== '1234') {
+      return res.status(401).json({ success: false, message: 'Invalid OTP code' });
     }
-    
-    // Check if the user (modeled in Cook schema for demo) exists, if not auto-create
-    let user = await cookService.findCookByPhone(phone);
+
+    let user = await userService.findUserByPhone(phoneNum);
+    const isRegistered = !!user;
+
     if (!user) {
-      user = await cookService.createCook({
-        name: 'Padosi Customer',
-        phone: phone,
-        status: 'Active',
-        tier: 1,
+      // New customer → require a name to create the account
+      if (!name || !name.toString().trim()) {
+        return res.status(400).json({ success: false, message: 'Name is required to create your account' });
+      }
+      user = await userService.createUser({
+        name: name.toString(),
+        phone: phoneNum,
+        email: email?.toString(),
+        fcmToken: fcmToken,
       });
+    } else if (fcmToken) {
+      user = await userService.updateFcmToken(user.id, fcmToken);
     }
-    
+
     const token = generateToken(user.id, 'user');
-    return res.status(200).json({ success: true, token, user });
+    return res.json({
+      success: true,
+      message: isRegistered ? 'Welcome back!' : 'Account created successfully',
+      data: {
+        token,
+        isRegistered,
+        status: user.status,
+        user,
+      },
+    });
   } catch (error) {
     next(error);
   }

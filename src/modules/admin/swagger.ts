@@ -32,60 +32,59 @@ paths:
       responses:
         '200':
           description: API is healthy
-  /api/user/auth/otp-login:
+  /api/user/auth/otp/send:
     post:
       tags:
         - User API
-      summary: Public OTP login for customer/user users
+      summary: Send OTP code to a customer's mobile number
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required:
+                - mobileNumber
               properties:
-                phone:
+                mobileNumber:
                   type: string
+                  example: "9876543210"
+      responses:
+        '200':
+          description: OTP sent successfully
+  /api/user/auth/otp/verify:
+    post:
+      tags:
+        - User API
+      summary: Verify customer OTP — creates the account (name + email) on first login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - mobileNumber
+                - otp
+                - name
+              properties:
+                mobileNumber:
+                  type: string
+                  example: "9876543210"
                 otp:
                   type: string
+                  example: "1234"
+                name:
+                  type: string
+                  example: "Ravi Kumar"
+                email:
+                  type: string
+                  example: "ravi@example.com"
+                fcmToken:
+                  type: string
       responses:
         '200':
-          description: Logged in successfully
-  /api/user/profile/{id}:
-    get:
-      tags:
-        - User API
-      summary: Fetch user/cook profile details by ID
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Profile retrieved successfully
-    put:
-      tags:
-        - User API
-      summary: Update user profile information
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        '200':
-          description: Profile updated successfully
+          description: OTP verified — account created/logged in, returns token and user
   /api/kitchen/auth/otp/send:
     post:
       tags:

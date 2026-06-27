@@ -4,8 +4,9 @@ import * as userCtrl from './user.controller';
 
 const router = express.Router();
 
-// Public user login via OTP
-router.post('/user/auth/otp-login', userCtrl.userLogin);
+// Public customer auth via OTP (two-step: send + verify)
+router.post('/user/auth/otp/send', userCtrl.sendOtp);
+router.post('/user/auth/otp/verify', userCtrl.verifyOtp);
 
 // Public endpoint to fetch a user profile (no auth required for demo)
 router.get('/user/profile/:id', userCtrl.getUserProfile);

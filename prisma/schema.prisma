@@ -97,6 +97,21 @@ model Cuisine {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  USER  (Customer) — separate from Cook. The same phone may have BOTH a
+//  User (customer) record and a Cook (kitchen) record; they are independent.
+// ─────────────────────────────────────────────────────────────────────────────
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?
+  phone     String   @unique
+  fcmToken  String?
+  status    String   @default("Active") // "Active" | "Blocked"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  MENU ITEM  (a dish belonging to a Cook / kitchen)
 // ─────────────────────────────────────────────────────────────────────────────
 model MenuItem {
