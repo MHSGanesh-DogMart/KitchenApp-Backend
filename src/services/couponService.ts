@@ -34,6 +34,7 @@ export const createCoupon = async (data: {
   cap: number;
   endsAt: Date | string;
   status?: string;
+  minOrderValue?: number;
 }) => {
   return prisma.coupon.create({
     data: {
@@ -41,6 +42,7 @@ export const createCoupon = async (data: {
       description: data.description,
       type: data.type,
       value: data.value,
+      minOrderValue: data.minOrderValue ?? 0,
       cap: data.cap,
       endsAt: new Date(data.endsAt),
       status: data.status || 'active'
@@ -55,6 +57,7 @@ export const updateCouponByCode = async (code: string, updates: {
   cap?: number;
   endsAt?: Date | string;
   status?: string;
+  minOrderValue?: number;
 }) => {
   const data: any = { ...updates };
   if (updates.endsAt) {

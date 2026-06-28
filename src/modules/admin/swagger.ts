@@ -540,6 +540,168 @@ paths:
       responses:
         '200':
           description: Updated cart + bill
+  /api/user/orders/checkout:
+    post:
+      tags:
+        - User Orders
+      summary: Start checkout — validates cart + creates a Razorpay order
+      description: >
+        Re-validates the cart (availability, delivery radius, coupon), creates a
+        PENDING_PAYMENT order, and opens a Razorpay order. Returns keyId +
+        razorpayOrderId + amount (paise) for the app's Razorpay sheet. The
+        KEY_SECRET is never sent.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fulfillment]
+              properties:
+                fulfillment: { type: string, enum: [delivery, pickup] }
+                addressId: { type: string, description: required for delivery }
+                note: { type: string }
+                lat: { type: number }
+                lng: { type: number }
+      responses:
+        '200':
+          description: "{ orderId, payment: { keyId, razorpayOrderId, amount, currency } }"
+        '400':
+          description: Empty cart / out of delivery range / invalid coupon
+  /api/user/orders/verify:
+    post:
+      tags:
+        - User Orders
+      summary: Verify Razorpay payment → confirm the order
+      description: Verifies the HMAC signature; on success confirms the order, clears the cart, issues a handoff code.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, razorpayPaymentId, razorpayOrderId, razorpaySignature]
+              properties:
+                orderId: { type: string }
+                razorpayPaymentId: { type: string }
+                razorpayOrderId: { type: string }
+                razorpaySignature: { type: string }
+      responses:
+        '200':
+          description: Order placed
+        '400':
+          description: Payment verification failed
+  /api/user/orders:
+    get:
+      tags:
+        - User Orders
+      summary: List the customer's orders (newest first)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Orders with items
+  /api/user/orders/{id}:
+    get:
+      tags:
+        - User Orders
+      summary: Get one order (detail / tracking)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Order detail
+  /api/user/addresses:
+    get:
+      tags:
+        - User Address
+      summary: List the customer's saved delivery addresses
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Addresses (default first)
+    post:
+      tags:
+        - User Address
+      summary: Add a delivery address (lat/lng from the map are required)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [line1, lat, lng]
+              properties:
+                label: { type: string, example: "Home" }
+                receiverName: { type: string }
+                receiverPhone: { type: string }
+                line1: { type: string, example: "Flat 402, Brigade Towers" }
+                landmark: { type: string }
+                area: { type: string }
+                city: { type: string }
+                pincode: { type: string }
+                lat: { type: number, example: 12.9352 }
+                lng: { type: number, example: 77.6245 }
+                isDefault: { type: boolean }
+      responses:
+        '201':
+          description: Address saved
+  /api/user/addresses/{id}:
+    put:
+      tags:
+        - User Address
+      summary: Update a saved address
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Updated
+    delete:
+      tags:
+        - User Address
+      summary: Delete a saved address
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Removed
+  /api/user/addresses/{id}/default:
+    patch:
+      tags:
+        - User Address
+      summary: Mark an address as the default
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Default set
   /api/admin/users:
     get:
       tags:

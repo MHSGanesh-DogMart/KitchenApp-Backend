@@ -2,6 +2,8 @@ import express from 'express';
 import { verifyToken } from '../../auth';
 import * as userCtrl from './user.controller';
 import * as cartCtrl from './cart.controller';
+import * as addressCtrl from './address.controller';
+import * as orderCtrl from './order.controller';
 
 const router = express.Router();
 
@@ -42,6 +44,19 @@ router.delete('/user/cart/item/:menuItemId', verifyToken, cartCtrl.removeItem);
 router.post('/user/cart/coupon', verifyToken, cartCtrl.applyCoupon);
 router.delete('/user/cart/coupon', verifyToken, cartCtrl.removeCoupon);
 router.delete('/user/cart', verifyToken, cartCtrl.clearCart);
+
+// Orders + Razorpay payment (token required)
+router.post('/user/orders/checkout', verifyToken, orderCtrl.checkout);
+router.post('/user/orders/verify', verifyToken, orderCtrl.verifyPayment);
+router.get('/user/orders', verifyToken, orderCtrl.listOrders);
+router.get('/user/orders/:id', verifyToken, orderCtrl.getOrder);
+
+// Saved delivery addresses (token required)
+router.get('/user/addresses', verifyToken, addressCtrl.getAddresses);
+router.post('/user/addresses', verifyToken, addressCtrl.addAddress);
+router.put('/user/addresses/:id', verifyToken, addressCtrl.updateAddress);
+router.delete('/user/addresses/:id', verifyToken, addressCtrl.deleteAddress);
+router.patch('/user/addresses/:id/default', verifyToken, addressCtrl.setDefaultAddress);
 
 // Wishlist / favourites (token required)
 router.get('/user/wishlist', verifyToken, userCtrl.getWishlist);

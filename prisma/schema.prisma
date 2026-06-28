@@ -80,6 +80,7 @@ model Coupon {
   description           String
   type                  String   // "flat" | "percent" | "free_delivery"
   value                 Float
+  minOrderValue         Float    @default(0) // min item total to use the coupon
   redemptions           Int      @default(0)
   cap                   Int      @default(9999)
   status                String   @default("active") // "active" | "scheduled" | "expired"
@@ -117,6 +118,29 @@ model User {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  ADDRESS  (customer saved delivery addresses, with map lat/lng)
+// ─────────────────────────────────────────────────────────────────────────────
+model Address {
+  id            String   @id @default(uuid())
+  userId        String
+  label         String   @default("Home") // "Home" | "Work" | "Other"
+  receiverName  String?
+  receiverPhone String?
+  line1         String // flat / house no. + building
+  landmark      String?
+  area          String?
+  city          String?
+  pincode       String?
+  lat           Float
+  lng           Float
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  FAVORITE / WISHLIST  (polymorphic — kitchen or dish, per customer)
 // ─────────────────────────────────────────────────────────────────────────────
 model Favorite {
@@ -151,6 +175,69 @@ model MenuItem {
   updatedAt   DateTime @updatedAt
 
   @@index([cookId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ORDER  (placed order — snapshot of items, address & bill at order time)
+// ─────────────────────────────────────────────────────────────────────────────
+model Order {
+  id          String  @id @default(uuid())
+  userId      String
+  cookId      String
+  kitchenName String? // snapshot of the kitchen name at order time
+
+  // PENDING_PAYMENT → PLACED → ACCEPTED → PREPARING → READY →
+  // OUT_FOR_DELIVERY → DELIVERED | CANCELLED | PAYMENT_FAILED
+  status        String @default("PENDING_PAYMENT")
+  paymentStatus String @default("PENDING") // PENDING | PAID | FAILED
+  fulfillment   String @default("delivery") // delivery | pickup
+
+  // delivery address snapshot
+  addressLabel   String?
+  addressLine1   String?
+  addressArea    String?
+  addressCity    String?
+  addressPincode String?
+  receiverName   String?
+  receiverPhone  String?
+  lat            Float?
+  lng            Float?
+  distanceKm     Float?
+
+  // bill snapshot
+  itemTotal    Float
+  discount     Float   @default(0)
+  couponCode   String?
+  deliveryFee  Float   @default(0)
+  taxesCharges Float   @default(0)
+  grandTotal   Float
+  cookingNote  String?
+  handoffCode  String? // delivery OTP / pickup code
+
+  // payment (Razorpay)
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+
+  items     OrderItem[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([cookId])
+}
+
+model OrderItem {
+  id         String  @id @default(uuid())
+  orderId    String
+  menuItemId String
+  name       String
+  price      Float
+  qty        Int
+  lineTotal  Float
+  imageUrl   String?
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

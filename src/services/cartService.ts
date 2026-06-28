@@ -146,7 +146,27 @@ export async function applyCoupon(userId: string, code: string) {
   const coupon = await couponService.findCouponByCode(code);
   const invalid = validateCoupon(coupon);
   if (invalid) throw new CartError(400, invalid);
+  // Enforce minimum order value
+  const itemTotal = await computeItemTotal(cart.id);
+  const min = coupon!.minOrderValue ?? 0;
+  if (min > 0 && itemTotal < min) {
+    throw new CartError(400, `Add ₹${Math.ceil(min - itemTotal)} more to use ${coupon!.code}`);
+  }
   return prisma.cart.update({ where: { id: cart.id }, data: { couponCode: coupon!.code } });
+}
+
+/** Server-side item total (available lines only) for a cart. */
+async function computeItemTotal(cartId: string): Promise<number> {
+  const lines = await prisma.cartItem.findMany({ where: { cartId } });
+  if (lines.length === 0) return 0;
+  const menuItems = await prisma.menuItem.findMany({
+    where: { id: { in: lines.map((l) => l.menuItemId) } },
+  });
+  const byId = new Map(menuItems.map((m) => [m.id, m]));
+  return lines.reduce((sum, l) => {
+    const m = byId.get(l.menuItemId);
+    return sum + (m && m.isAvailable ? m.price * l.qty : 0);
+  }, 0);
 }
 
 export async function removeCoupon(userId: string) {
@@ -227,14 +247,24 @@ export async function getCartWithBill(
   if (opts.lat != null && opts.lng != null && cook?.lat != null && cook?.lng != null) {
     dist = Math.round(distanceKm(opts.lat, opts.lng, cook.lat, cook.lng) * 10) / 10;
   }
-  // Per-kitchen delivery radius overrides the admin default; pickup radius is global.
+  // Per-kitchen delivery radius overrides the admin default.
   const radiusKm = cook?.serviceRadiusKm ?? config.deliveryRadiusKm;
   let serviceable = true;
+  let serviceMessage: string | null = null;
   if (fulfillment === 'delivery') {
-    serviceable = dist != null ? dist <= radiusKm : false; // delivery needs coords
-  } else {
-    serviceable = dist != null ? dist <= config.pickupRadiusKm : true; // pickup lenient
+    // DELIVERY → must be within the kitchen's serviceable radius.
+    const kitchenName = cook?.kitchenName || cook?.name || 'This kitchen';
+    if (dist == null) {
+      serviceable = false;
+      serviceMessage = 'Add a delivery address to check if this kitchen delivers to you.';
+    } else if (dist > radiusKm) {
+      serviceable = false;
+      serviceMessage =
+        `${kitchenName} delivers within ${radiusKm} km, but your address is ${dist} km away. ` +
+        `Switch to Pickup or choose a closer address.`;
+    }
   }
+  // PICKUP → no distance restriction at all.
 
   // Coupon
   let discount = 0;
@@ -244,8 +274,11 @@ export async function getCartWithBill(
   if (cart.couponCode) {
     const coupon = await couponService.findCouponByCode(cart.couponCode);
     const invalid = validateCoupon(coupon);
+    const min = coupon?.minOrderValue ?? 0;
     if (invalid) {
       couponError = invalid;
+    } else if (min > 0 && itemTotal < min) {
+      couponError = `Add ₹${Math.ceil(min - itemTotal)} more to use ${coupon!.code}`;
     } else {
       couponValid = true;
       const r = couponDiscount(coupon, itemTotal);
@@ -274,6 +307,7 @@ export async function getCartWithBill(
     distanceKm: dist,
     serviceRadiusKm: radiusKm,
     serviceable,
+    serviceMessage,
     items,
     itemCount,
     bill: {
@@ -297,6 +331,7 @@ function emptyCart(cartId: string, fulfillment: 'delivery' | 'pickup', radiusKm:
     distanceKm: null,
     serviceRadiusKm: radiusKm,
     serviceable: true,
+    serviceMessage: null,
     items: [],
     itemCount: 0,
     bill: {
