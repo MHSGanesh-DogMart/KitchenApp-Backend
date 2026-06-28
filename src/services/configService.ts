@@ -11,6 +11,8 @@ const DEFAULT_CONFIG = {
   defaultStateRadius: 100000,
   defaultCityRadius: 15000,
   defaultVillageRadius: 5000,
+  deliveryRadiusKm: 10,
+  pickupRadiusKm: 25,
   payoutCycle: 'Weekly · Friday 6 PM IST',
   minimumPayout: 500,
   bankRail: 'UPI · NEFT fallback'

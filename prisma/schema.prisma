@@ -25,6 +25,7 @@ model Cook {
   fssaiExpiry      String?
   lat              Float?
   lng              Float?
+  serviceRadiusKm  Float?    // delivery radius in km; null → platform default
   meals            String?
   capacity         Int?
   cutoffNotice     String?
@@ -37,7 +38,7 @@ model Cook {
   cookingUrl       String?
   storageUrl       String?
   sinkUrl          String?
-  fcmToken         String?
+  fcmTokens        String[]  @default([])
   address          String?
   kitchenName      String?
   bannerUrl        String?
@@ -65,6 +66,8 @@ model PlatformConfig {
   defaultStateRadius    Float    @default(100000.0)
   defaultCityRadius     Float    @default(15000.0)
   defaultVillageRadius  Float    @default(5000.0)
+  deliveryRadiusKm      Float    @default(10.0)  // default kitchen delivery radius (km)
+  pickupRadiusKm        Float    @default(25.0)  // max distance allowed for pickup (km)
   payoutCycle           String   @default("Weekly · Friday 6 PM IST")
   minimumPayout         Float    @default(500.0)
   bankRail              String   @default("UPI · NEFT fallback")
@@ -107,10 +110,24 @@ model User {
   phone         String   @unique
   dob           String?
   profilePicUrl String?
-  fcmToken      String?
+  fcmTokens     String[] @default([])
   status        String   @default("Active") // "Active" | "Blocked"
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  FAVORITE / WISHLIST  (polymorphic — kitchen or dish, per customer)
+// ─────────────────────────────────────────────────────────────────────────────
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String // "kitchen" | "dish"
+  targetId  String // Cook.id or MenuItem.id
+  createdAt DateTime @default(now())
+
+  @@unique([userId, type, targetId])
+  @@index([userId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -134,4 +151,29 @@ model MenuItem {
   updatedAt   DateTime @updatedAt
 
   @@index([cookId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  CART  (server-side, one per customer; a cart belongs to exactly ONE kitchen)
+// ─────────────────────────────────────────────────────────────────────────────
+model Cart {
+  id         String     @id @default(uuid())
+  userId     String     @unique // one active cart per customer
+  cookId     String? // the single kitchen this cart is locked to
+  couponCode String? // applied coupon (validated at read + at order placement)
+  items      CartItem[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model CartItem {
+  id         String   @id @default(uuid())
+  cartId     String
+  menuItemId String // → MenuItem.id (price/availability looked up live)
+  qty        Int      @default(1)
+  createdAt  DateTime @default(now())
+  cart       Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, menuItemId])
+  @@index([cartId])
 }

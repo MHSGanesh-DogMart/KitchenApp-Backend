@@ -4,6 +4,8 @@ import * as userService from '../../services/userService';
 import * as cuisineService from '../../services/cuisineService';
 import * as cookService from '../../services/cookService';
 import * as menuService from '../../services/menuService';
+import * as favoriteService from '../../services/favoriteService';
+import * as couponService from '../../services/couponService';
 import { generateToken } from '../../auth';
 import { uploadToFirebase } from '../../services/firebaseStorage';
 
@@ -42,6 +44,9 @@ export const getHome = async (req: Request, res: Response, next: NextFunction) =
     const userId = (req as any).user?.id;
     const me = userId ? await userService.findUserById(userId) : null;
     const userName = me?.name ?? null;
+    const favs = userId
+      ? await favoriteService.favoritedSets(userId)
+      : { kitchen: new Set<string>(), dish: new Set<string>() };
 
     // Resolve cuisine name for filtering (category chips send a cuisine id)
     let cuisineName: string | undefined;
@@ -84,7 +89,7 @@ export const getHome = async (req: Request, res: Response, next: NextFunction) =
         rating: null, // ratings not tracked yet
         distanceKm: dist,
         etaMins: dist != null ? Math.max(15, Math.round(dist * 8) + 20) : null,
-        isWishlisted: false, // wishlist not implemented yet
+        isWishlisted: favs.kitchen.has(c.id),
       };
     });
 
@@ -113,6 +118,7 @@ export const getHome = async (req: Request, res: Response, next: NextFunction) =
           cookId: d.cookId,
           cookName: cook?.kitchenName || cook?.name,
           isAvailable: d.isAvailable,
+          isWishlisted: favs.dish.has(d.id),
         };
       });
 
@@ -157,8 +163,8 @@ export const updateMyProfile = async (req: Request, res: Response, next: NextFun
   try {
     const id = (req as any).user?.id;
     if (!id) return res.status(401).json({ success: false, message: 'Unauthorized' });
-    const { name, email, dob, profilePicUrl, fcmToken } = req.body;
-    const saved = await userService.updateUser(id, { name, email, dob, profilePicUrl, fcmToken });
+    const { name, email, dob, profilePicUrl } = req.body;
+    const saved = await userService.updateUser(id, { name, email, dob, profilePicUrl });
     return res.json({ success: true, message: 'Profile updated successfully', data: saved });
   } catch (error) {
     next(error);
@@ -198,10 +204,14 @@ export const sendOtp = async (req: Request, res: Response, next: NextFunction) =
     if (!phoneNum) {
       return res.status(400).json({ success: false, message: 'Mobile number is required' });
     }
+    // Tell the app whether this phone already has an account, so it can
+    // show "Login" (existing) vs "Create account" + name/email (new).
+    const existing = await userService.findUserByPhone(phoneNum);
     console.log(`[OTP] Sent verification OTP code 1234 to customer: ${phoneNum}`);
     return res.json({
       success: true,
       message: 'OTP sent successfully (Code: 1234)',
+      isRegistered: !!existing,
     });
   } catch (error) {
     next(error);
@@ -241,7 +251,7 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
         fcmToken: fcmToken,
       });
     } else if (fcmToken) {
-      user = await userService.updateFcmToken(user.id, fcmToken);
+      user = (await userService.addFcmToken(user.id, fcmToken)) || user;
     }
 
     const token = generateToken(user.id, 'user');
@@ -260,8 +270,56 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
   }
 };
 
+/** Register/append this device's FCM token for the authenticated customer. */
+export const updateFcmToken = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = (req as any).user?.id;
+    if (!id) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const { fcmToken } = req.body;
+    if (!fcmToken) return res.status(400).json({ success: false, message: 'FCM token is required' });
+    const user = await userService.addFcmToken(id, fcmToken);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    return res.json({ success: true, message: 'FCM token registered', data: { fcmTokens: user.fcmTokens } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Logout this device: drop its FCM token so it stops receiving pushes.
+ * The client also clears its own JWT locally. Other devices stay logged in.
+ */
+export const logout = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = (req as any).user?.id;
+    if (!id) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const { fcmToken } = req.body;
+    if (fcmToken) await userService.removeFcmToken(id, fcmToken);
+    return res.json({ success: true, message: 'Logged out successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** Permanently delete the authenticated customer's account + their data. */
+export const deleteAccount = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = (req as any).user?.id;
+    if (!id) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    await userService.deleteUser(id);
+    return res.json({ success: true, message: 'Account deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ── Shared card mappers (kitchen browse) ─────────────────────────────────────
-function buildCookCard(c: any, lat: number | null, lng: number | null) {
+function buildCookCard(
+  c: any,
+  lat: number | null,
+  lng: number | null,
+  favKitchens?: Set<string>,
+) {
   let dist: number | null = null;
   if (lat != null && lng != null && c.lat != null && c.lng != null) {
     dist = Math.round(distanceKm(lat, lng, c.lat, c.lng) * 10) / 10;
@@ -287,11 +345,11 @@ function buildCookCard(c: any, lat: number | null, lng: number | null) {
     rating: null,
     distanceKm: dist,
     etaMins: dist != null ? Math.max(15, Math.round(dist * 8) + 20) : null,
-    isWishlisted: false,
+    isWishlisted: favKitchens?.has(c.id) ?? false,
   };
 }
 
-function buildDishCard(d: any, cook: any) {
+function buildDishCard(d: any, cook: any, favDishes?: Set<string>) {
   return {
     id: d.id,
     name: d.name,
@@ -306,6 +364,7 @@ function buildDishCard(d: any, cook: any) {
     cookId: d.cookId,
     cookName: cook?.kitchenName || cook?.name,
     isAvailable: d.isAvailable,
+    isWishlisted: favDishes?.has(d.id) ?? false,
   };
 }
 
@@ -313,6 +372,14 @@ const parseLatLng = (req: Request) => ({
   lat: req.query.lat ? parseFloat(req.query.lat as string) : null,
   lng: req.query.lng ? parseFloat(req.query.lng as string) : null,
 });
+
+/** The caller's favourite id-sets (empty if no token). */
+async function favsFor(req: Request) {
+  const userId = (req as any).user?.id;
+  return userId
+    ? await favoriteService.favoritedSets(userId)
+    : { kitchen: new Set<string>(), dish: new Set<string>() };
+}
 
 /** Slice an already-sorted array into a page + meta. */
 function paginate<T>(items: T[], req: Request) {
@@ -342,7 +409,8 @@ export const listKitchens = async (req: Request, res: Response, next: NextFuncti
       const needle = cuisineName.toLowerCase();
       cooks = cooks.filter((c: any) => (c.cuisines || '').toLowerCase().includes(needle));
     }
-    const cards = cooks.map((c: any) => buildCookCard(c, lat, lng));
+    const favs = await favsFor(req);
+    const cards = cooks.map((c: any) => buildCookCard(c, lat, lng, favs.kitchen));
     if (lat != null && lng != null) {
       cards.sort((a: any, b: any) => (a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9));
     }
@@ -361,7 +429,8 @@ export const getKitchenById = async (req: Request, res: Response, next: NextFunc
     if (!c || !LIVE_STATUSES.includes(c.status)) {
       return res.status(404).json({ success: false, message: 'Kitchen not found' });
     }
-    return res.json({ success: true, data: buildCookCard(c, lat, lng) });
+    const favs = await favsFor(req);
+    return res.json({ success: true, data: buildCookCard(c, lat, lng, favs.kitchen) });
   } catch (error) {
     next(error);
   }
@@ -375,7 +444,11 @@ export const getKitchenMenu = async (req: Request, res: Response, next: NextFunc
     const dishes = (await menuService.listMenusByCook(req.params.id as string)).filter(
       (d) => d.isAvailable,
     );
-    return res.json({ success: true, data: dishes.map((d) => buildDishCard(d, c)) });
+    const favs = await favsFor(req);
+    return res.json({
+      success: true,
+      data: dishes.map((d) => buildDishCard(d, c, favs.dish)),
+    });
   } catch (error) {
     next(error);
   }
@@ -397,7 +470,8 @@ export const listDishes = async (req: Request, res: Response, next: NextFunction
     }
     const cookMap = new Map(cooks.map((c: any) => [c.id, c]));
     const dishes = (await menuService.listAvailableMenus()).filter((d) => cookMap.has(d.cookId));
-    const cards = dishes.map((d) => buildDishCard(d, cookMap.get(d.cookId)));
+    const favs = await favsFor(req);
+    const cards = dishes.map((d) => buildDishCard(d, cookMap.get(d.cookId), favs.dish));
     const { data, pagination } = paginate(cards, req);
     return res.json({ success: true, data, pagination });
   } catch (error) {
@@ -427,14 +501,79 @@ export const getDishById = async (req: Request, res: Response, next: NextFunctio
       );
       recs = [...recs, ...others];
     }
+    const favs = await favsFor(req);
     const recommended = recs
       .slice(0, 6)
-      .map((r) => buildDishCard(r, cookMap.get(r.cookId)));
+      .map((r) => buildDishCard(r, cookMap.get(r.cookId), favs.dish));
 
     return res.json({
       success: true,
-      data: { ...buildDishCard(d, cook), recommended },
+      data: { ...buildDishCard(d, cook, favs.dish), recommended },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ── Wishlist (favourites) ────────────────────────────────────────────────────
+const VALID_TYPES = ['kitchen', 'dish'];
+
+/** POST /api/user/wishlist — add a favourite */
+export const addWishlist = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { type, targetId } = req.body;
+    if (!VALID_TYPES.includes(type) || !targetId) {
+      return res.status(400).json({ success: false, message: 'type (kitchen|dish) and targetId are required' });
+    }
+    await favoriteService.addFavorite(userId, type, targetId);
+    return res.json({ success: true, message: 'Added to wishlist' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** DELETE /api/user/wishlist/:type/:targetId — remove a favourite */
+export const removeWishlist = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).user?.id;
+    const type = req.params.type as string;
+    const targetId = req.params.targetId as string;
+    if (!VALID_TYPES.includes(type)) {
+      return res.status(400).json({ success: false, message: 'Invalid type' });
+    }
+    await favoriteService.removeFavorite(userId, type as any, targetId);
+    return res.json({ success: true, message: 'Removed from wishlist' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** GET /api/user/wishlist?type=kitchen|dish — full favourited cards */
+export const getWishlist = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).user?.id;
+    const type = req.query.type as string | undefined;
+    const allCooks = await cookService.listAllCooks();
+    const cookMap = new Map(allCooks.map((c: any) => [c.id, c]));
+
+    const result: any = {};
+
+    if (!type || type === 'kitchen') {
+      const ids = await favoriteService.listFavoriteIds(userId, 'kitchen');
+      result.kitchens = ids
+        .map((id) => cookMap.get(id))
+        .filter(Boolean)
+        .map((c: any) => buildCookCard(c, null, null, new Set(ids)));
+    }
+    if (!type || type === 'dish') {
+      const ids = await favoriteService.listFavoriteIds(userId, 'dish');
+      const idSet = new Set(ids);
+      const dishes = (await menuService.listAvailableMenus()).filter((d) => idSet.has(d.id));
+      result.dishes = dishes.map((d) => buildDishCard(d, cookMap.get(d.cookId), idSet));
+    }
+
+    return res.json({ success: true, data: result });
   } catch (error) {
     next(error);
   }
@@ -445,6 +584,20 @@ export const getCuisines = async (req: Request, res: Response, next: NextFunctio
   try {
     const cuisines = await cuisineService.listCuisines(undefined, true);
     return res.json({ success: true, data: cuisines });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** Public list of coupons a customer can apply (active + not expired). */
+export const getCoupons = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const now = Date.now();
+    const all = await couponService.listCoupons(undefined, 'active');
+    const usable = all.filter(
+      (c) => (!c.endsAt || new Date(c.endsAt).getTime() > now) && c.redemptions < c.cap,
+    );
+    return res.json({ success: true, data: usable });
   } catch (error) {
     next(error);
   }

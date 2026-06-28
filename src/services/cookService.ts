@@ -122,12 +122,27 @@ export async function updateFssai(id: string, data: { fssaiNumber?: string; fssa
   return parseCook(updated);
 }
 
-/** Update FCM Token for push notifications */
+/** Append a device FCM token (dedup; supports multiple devices). */
 export async function updateFcmToken(id: string, data: any): Promise<any> {
   const fcmToken = typeof data === 'string' ? data : data?.fcmToken;
+  if (!fcmToken) return findCookById(id);
+  const cook = await prisma.cook.findUnique({ where: { id } });
+  if (!cook) return null;
+  if (cook.fcmTokens.includes(fcmToken)) return parseCook(cook);
   const updated = await prisma.cook.update({
     where: { id },
-    data: { fcmToken },
+    data: { fcmTokens: { push: fcmToken } },
+  });
+  return parseCook(updated);
+}
+
+/** Remove a single device token (used on logout from that device). */
+export async function removeFcmToken(id: string, fcmToken: string): Promise<any> {
+  const cook = await prisma.cook.findUnique({ where: { id } });
+  if (!cook) return null;
+  const updated = await prisma.cook.update({
+    where: { id },
+    data: { fcmTokens: { set: cook.fcmTokens.filter((t) => t !== fcmToken) } },
   });
   return parseCook(updated);
 }

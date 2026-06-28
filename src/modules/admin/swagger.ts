@@ -262,6 +262,67 @@ paths:
       responses:
         '200':
           description: Dish details with a "recommended" array
+  /api/user/wishlist:
+    get:
+      tags:
+        - User API
+      summary: Get the customer's wishlist (kitchens and/or dishes)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [kitchen, dish]
+          description: Omit for both
+      responses:
+        '200':
+          description: "{ kitchens: [...], dishes: [...] }"
+    post:
+      tags:
+        - User API
+      summary: Add a kitchen or dish to the wishlist
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, targetId]
+              properties:
+                type:
+                  type: string
+                  enum: [kitchen, dish]
+                targetId:
+                  type: string
+      responses:
+        '200':
+          description: Added
+  /api/user/wishlist/{type}/{targetId}:
+    delete:
+      tags:
+        - User API
+      summary: Remove a kitchen or dish from the wishlist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [kitchen, dish]
+        - name: targetId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Removed
   /api/user/upload:
     post:
       tags:
@@ -282,6 +343,203 @@ paths:
       responses:
         '200':
           description: Image uploaded — returns fileUrl
+  /api/user/fcm-token:
+    post:
+      tags:
+        - User API
+      summary: Register/append this device's FCM token (supports multiple devices)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fcmToken
+              properties:
+                fcmToken:
+                  type: string
+                  example: "fcm_device_token_abc123"
+      responses:
+        '200':
+          description: Token registered — returns the full fcmTokens array
+  /api/user/logout:
+    post:
+      tags:
+        - User API
+      summary: Logout this device (removes its FCM token; client clears its JWT)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fcmToken:
+                  type: string
+                  description: This device's token to drop so it stops receiving pushes
+                  example: "fcm_device_token_abc123"
+      responses:
+        '200':
+          description: Logged out successfully
+  /api/user/account:
+    delete:
+      tags:
+        - User API
+      summary: Permanently delete the authenticated customer's account + data
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Account deleted successfully
+  /api/user/cart:
+    get:
+      tags:
+        - User Cart
+      summary: Get the cart + server-computed bill (single kitchen)
+      description: >
+        Pass lat/lng + fulfillment as query params. Delivery fee + serviceable
+        radius are computed server-side. The client never sends prices.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: lat
+          schema: { type: number }
+        - in: query
+          name: lng
+          schema: { type: number }
+        - in: query
+          name: fulfillment
+          schema: { type: string, enum: [delivery, pickup] }
+      responses:
+        '200':
+          description: Cart with items, kitchen, distanceKm, serviceable + bill
+    delete:
+      tags:
+        - User Cart
+      summary: Clear the whole cart (unlocks kitchen + drops coupon)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Empty cart
+  /api/user/cart/add:
+    post:
+      tags:
+        - User Cart
+      summary: Add a dish to the cart
+      description: >
+        Returns 409 with code CART_KITCHEN_CONFLICT if the cart already has
+        items from a different kitchen. Send force=true to clear + switch.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [menuItemId]
+              properties:
+                menuItemId: { type: string }
+                qty: { type: integer, example: 1 }
+                force: { type: boolean, description: Clear existing cart from another kitchen and add }
+                lat: { type: number }
+                lng: { type: number }
+                fulfillment: { type: string, enum: [delivery, pickup] }
+      responses:
+        '200':
+          description: Updated cart + bill
+        '409':
+          description: CART_KITCHEN_CONFLICT — cart belongs to another kitchen
+  /api/user/cart/increment:
+    post:
+      tags:
+        - User Cart
+      summary: Increment a line's quantity by 1
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [menuItemId]
+              properties:
+                menuItemId: { type: string }
+      responses:
+        '200':
+          description: Updated cart + bill
+  /api/user/cart/decrement:
+    post:
+      tags:
+        - User Cart
+      summary: Decrement a line by 1 (removes the line at 0; empties unlock kitchen)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [menuItemId]
+              properties:
+                menuItemId: { type: string }
+      responses:
+        '200':
+          description: Updated cart + bill
+  /api/user/cart/item/{menuItemId}:
+    delete:
+      tags:
+        - User Cart
+      summary: Remove a line entirely
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: menuItemId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Updated cart + bill
+  /api/user/cart/coupon:
+    post:
+      tags:
+        - User Cart
+      summary: Apply a coupon to the cart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, example: "FRESH50" }
+      responses:
+        '200':
+          description: Updated cart + bill (with discount)
+        '400':
+          description: Invalid/expired/limit-reached coupon
+    delete:
+      tags:
+        - User Cart
+      summary: Remove the applied coupon
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Updated cart + bill
   /api/admin/users:
     get:
       tags:
@@ -1188,6 +1446,14 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Cuisine'
+  /api/user/coupons:
+    get:
+      tags:
+        - User API
+      summary: Get usable coupons (active + not expired) for the customer app
+      responses:
+        '200':
+          description: List of usable coupons
   /api/user/cuisines:
     get:
       tags:

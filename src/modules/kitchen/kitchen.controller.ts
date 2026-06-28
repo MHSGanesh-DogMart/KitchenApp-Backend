@@ -49,10 +49,9 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
 
     const cook = await cookService.findCookByPhone(phoneNum);
     if (cook) {
-      // Sync FCM token if provided on verification
+      // Append this device's FCM token if provided on verification
       if (fcmToken) {
         await cookService.updateFcmToken(cook.id, fcmToken);
-        cook.fcmToken = fcmToken;
       }
       const token = generateToken(cook.id, 'kitchen');
       return res.json({
