@@ -200,3 +200,87 @@ export async function getOrder(userId: string, id: string) {
   const order = await prisma.order.findUnique({ where: { id }, include: { items: true } });
   return order && order.userId === userId ? order : null;
 }
+
+// ── Status flow ─────────────────────────────────────────────────────────────
+const FLOW = ['PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED'];
+const CANCELLABLE_BY_CUSTOMER = ['PLACED', 'ACCEPTED'];
+
+/** Customer cancels their own order (only before the kitchen starts cooking). */
+export async function cancelOrder(userId: string, id: string) {
+  const order = await prisma.order.findUnique({ where: { id } });
+  if (!order || order.userId !== userId) throw new OrderError(404, 'Order not found');
+  if (order.status === 'CANCELLED') return order;
+  if (!CANCELLABLE_BY_CUSTOMER.includes(order.status)) {
+    throw new OrderError(400, 'This order can no longer be cancelled.');
+  }
+  return prisma.$transaction(async (tx) => {
+    const o = await tx.order.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+      include: { items: true },
+    });
+    // Release the coupon redemption back.
+    if (order.couponCode) {
+      await tx.coupon.updateMany({
+        where: { code: order.couponCode, redemptions: { gt: 0 } },
+        data: { redemptions: { decrement: 1 } },
+      });
+    }
+    return o;
+  });
+}
+
+// ── Kitchen side (cook = token user id) ──────────────────────────────────────
+
+export async function listKitchenOrders(cookId: string, status?: string) {
+  return prisma.order.findMany({
+    where: {
+      cookId,
+      status: status ? status : { notIn: ['PENDING_PAYMENT', 'PAYMENT_FAILED'] },
+    },
+    orderBy: { createdAt: 'desc' },
+    include: { items: true },
+  });
+}
+
+export async function getKitchenOrder(cookId: string, id: string) {
+  const order = await prisma.order.findUnique({ where: { id }, include: { items: true } });
+  return order && order.cookId === cookId ? order : null;
+}
+
+export async function acceptOrder(cookId: string, id: string) {
+  const order = await getKitchenOrder(cookId, id);
+  if (!order) throw new OrderError(404, 'Order not found');
+  if (order.status !== 'PLACED') throw new OrderError(400, 'Only newly placed orders can be accepted.');
+  return prisma.order.update({ where: { id }, data: { status: 'ACCEPTED' }, include: { items: true } });
+}
+
+export async function rejectOrder(cookId: string, id: string) {
+  const order = await getKitchenOrder(cookId, id);
+  if (!order) throw new OrderError(404, 'Order not found');
+  if (!['PLACED', 'ACCEPTED'].includes(order.status)) {
+    throw new OrderError(400, 'This order can no longer be rejected.');
+  }
+  return prisma.$transaction(async (tx) => {
+    const o = await tx.order.update({ where: { id }, data: { status: 'CANCELLED' }, include: { items: true } });
+    if (order.couponCode) {
+      await tx.coupon.updateMany({
+        where: { code: order.couponCode, redemptions: { gt: 0 } },
+        data: { redemptions: { decrement: 1 } },
+      });
+    }
+    return o;
+  });
+}
+
+/** Move an order forward: PREPARING → READY → OUT_FOR_DELIVERY → DELIVERED. */
+export async function updateKitchenStatus(cookId: string, id: string, target: string) {
+  const order = await getKitchenOrder(cookId, id);
+  if (!order) throw new OrderError(404, 'Order not found');
+  const from = FLOW.indexOf(order.status);
+  const to = FLOW.indexOf(target);
+  if (from < 0) throw new OrderError(400, `Cannot update a ${order.status.toLowerCase()} order.`);
+  if (to < 0) throw new OrderError(400, 'Invalid status.');
+  if (to <= from) throw new OrderError(400, 'Order status can only move forward.');
+  return prisma.order.update({ where: { id }, data: { status: target }, include: { items: true } });
+}

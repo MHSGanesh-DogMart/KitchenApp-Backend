@@ -50,6 +50,7 @@ router.post('/user/orders/checkout', verifyToken, orderCtrl.checkout);
 router.post('/user/orders/verify', verifyToken, orderCtrl.verifyPayment);
 router.get('/user/orders', verifyToken, orderCtrl.listOrders);
 router.get('/user/orders/:id', verifyToken, orderCtrl.getOrder);
+router.patch('/user/orders/:id/cancel', verifyToken, orderCtrl.cancelOrder);
 
 // Saved delivery addresses (token required)
 router.get('/user/addresses', verifyToken, addressCtrl.getAddresses);

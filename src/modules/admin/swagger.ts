@@ -620,6 +620,110 @@ paths:
       responses:
         '200':
           description: Order detail
+  /api/user/orders/{id}/cancel:
+    patch:
+      tags:
+        - User Orders
+      summary: Cancel an order (only while PLACED or ACCEPTED)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Order cancelled
+        '400':
+          description: Order can no longer be cancelled
+  /api/kitchen/orders:
+    get:
+      tags:
+        - Kitchen Orders
+      summary: List the logged-in kitchen's orders (optional ?status=)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, example: PLACED }
+      responses:
+        '200':
+          description: Orders with items
+  /api/kitchen/orders/{id}:
+    get:
+      tags:
+        - Kitchen Orders
+      summary: Get one order for the kitchen
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Order detail
+  /api/kitchen/orders/{id}/accept:
+    patch:
+      tags:
+        - Kitchen Orders
+      summary: Accept a newly placed order (PLACED → ACCEPTED)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Accepted
+  /api/kitchen/orders/{id}/reject:
+    patch:
+      tags:
+        - Kitchen Orders
+      summary: Reject an order (→ CANCELLED, releases coupon)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Rejected
+  /api/kitchen/orders/{id}/status:
+    patch:
+      tags:
+        - Kitchen Orders
+      summary: Move an order forward (PREPARING → READY → OUT_FOR_DELIVERY → DELIVERED)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [PREPARING, READY, OUT_FOR_DELIVERY, DELIVERED]
+      responses:
+        '200':
+          description: Updated
+        '400':
+          description: Invalid / backward transition
   /api/user/addresses:
     get:
       tags:

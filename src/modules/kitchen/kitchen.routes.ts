@@ -2,6 +2,7 @@ import express from 'express';
 import { verifyToken } from '../../auth';
 import * as kitchenCtrl from './kitchen.controller';
 import * as menuCtrl from './menu.controller';
+import * as orderCtrl from './order.controller';
 
 const router = express.Router();
 
@@ -24,5 +25,12 @@ router.post('/kitchen/menu', verifyToken, menuCtrl.addMenu);
 router.put('/kitchen/menu/:id', verifyToken, menuCtrl.editMenu);
 router.patch('/kitchen/menu/:id/availability', verifyToken, menuCtrl.toggleAvailability);
 router.delete('/kitchen/menu/:id', verifyToken, menuCtrl.removeMenu);
+
+// --- Orders (kitchen-scoped, token required) ---
+router.get('/kitchen/orders', verifyToken, orderCtrl.listOrders);
+router.get('/kitchen/orders/:id', verifyToken, orderCtrl.getOrder);
+router.patch('/kitchen/orders/:id/accept', verifyToken, orderCtrl.acceptOrder);
+router.patch('/kitchen/orders/:id/reject', verifyToken, orderCtrl.rejectOrder);
+router.patch('/kitchen/orders/:id/status', verifyToken, orderCtrl.updateStatus);
 
 export default router;

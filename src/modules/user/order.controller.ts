@@ -68,3 +68,15 @@ export const getOrder = async (req: Request, res: Response, next: NextFunction) 
     next(e);
   }
 };
+
+export const cancelOrder = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = uid(req);
+    if (!id) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const order = await orderService.cancelOrder(id, String(req.params.id));
+    return res.json({ success: true, message: 'Order cancelled', data: order });
+  } catch (e) {
+    if (e instanceof OrderError) return res.status(e.status).json({ success: false, message: e.message });
+    next(e);
+  }
+};
