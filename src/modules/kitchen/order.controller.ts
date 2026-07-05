@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as orderService from '../../services/orderService';
 import { OrderError } from '../../services/orderService';
+import * as cookService from '../../services/cookService';
 
 // The kitchen token's user id IS the cook id (generateToken(cook.id, 'kitchen')).
 const cookId = (req: Request) => (req as any).user?.id as string | undefined;
@@ -13,6 +14,18 @@ export const listOrders = async (req: Request, res: Response, next: NextFunction
     const status = req.query.status ? String(req.query.status) : undefined;
     const orders = await orderService.listKitchenOrders(id, status);
     return res.json({ success: true, data: orders });
+  } catch (e) {
+    next(e);
+  }
+};
+
+/** GET /kitchen/summary — today's earnings + 7-day sparkline for the dashboard. */
+export const getSummary = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = cookId(req);
+    if (!id) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const summary = await orderService.getKitchenSummary(id);
+    return res.json({ success: true, data: summary });
   } catch (e) {
     next(e);
   }
@@ -50,6 +63,22 @@ export const rejectOrder = async (req: Request, res: Response, next: NextFunctio
     return res.json({ success: true, message: 'Order rejected', data: order });
   } catch (e) {
     if (e instanceof OrderError) return res.status(e.status).json({ success: false, message: e.message });
+    next(e);
+  }
+};
+
+/** PATCH /kitchen/availability { acceptingOrders } — open/close the kitchen. */
+export const setAvailability = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = cookId(req);
+    if (!id) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const { acceptingOrders } = req.body;
+    if (typeof acceptingOrders !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'acceptingOrders (boolean) is required' });
+    }
+    const cook = await cookService.setAcceptingOrders(id, acceptingOrders);
+    return res.json({ success: true, message: acceptingOrders ? 'Kitchen is open' : 'Kitchen is closed', data: { acceptingOrders: cook.acceptingOrders } });
+  } catch (e) {
     next(e);
   }
 };

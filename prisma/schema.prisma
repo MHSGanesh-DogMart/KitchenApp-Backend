@@ -39,6 +39,7 @@ model Cook {
   storageUrl       String?
   sinkUrl          String?
   fcmTokens        String[]  @default([])
+  acceptingOrders  Boolean   @default(true) // kitchen open/closed toggle
   address          String?
   kitchenName      String?
   bannerUrl        String?

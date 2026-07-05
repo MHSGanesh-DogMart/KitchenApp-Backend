@@ -10,7 +10,7 @@ info:
   version: 1.0.0
   description: API documentation for Padosi Customer, Partner/Kitchen, and Admin apps.
 servers:
-  - url: http://13.207.196.137
+  - url: http://13.207.75.184
     description: AWS production server
   - url: http://localhost:5000
     description: Local development server
@@ -637,6 +637,35 @@ paths:
           description: Order cancelled
         '400':
           description: Order can no longer be cancelled
+  /api/kitchen/availability:
+    patch:
+      tags:
+        - Kitchen Orders
+      summary: Open/close the kitchen for new orders
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [acceptingOrders]
+              properties:
+                acceptingOrders: { type: boolean }
+      responses:
+        '200':
+          description: Updated — returns acceptingOrders
+  /api/kitchen/summary:
+    get:
+      tags:
+        - Kitchen Orders
+      summary: Dashboard summary — today's earnings, order count, 7-day sparkline
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: "{ todayEarned, todayOrders, avgOrder, weekly[7], totalDelivered }"
   /api/kitchen/orders:
     get:
       tags:

@@ -85,6 +85,12 @@ export async function checkout(
   }
   if (!cart.kitchen) throw new OrderError(400, 'Cart kitchen missing');
 
+  // Kitchen must be open/accepting orders.
+  const cook = await prisma.cook.findUnique({ where: { id: cart.kitchen.id } });
+  if (cook && cook.acceptingOrders === false) {
+    throw new OrderError(400, `${cook.kitchenName || cook.name} is not accepting orders right now.`);
+  }
+
   const bill = cart.bill;
   const order = await prisma.order.create({
     data: {
@@ -241,6 +247,37 @@ export async function listKitchenOrders(cookId: string, status?: string) {
     orderBy: { createdAt: 'desc' },
     include: { items: true },
   });
+}
+
+/** Dashboard summary for the kitchen: today's earnings + a 7-day sparkline. */
+export async function getKitchenSummary(cookId: string) {
+  const delivered = await prisma.order.findMany({
+    where: { cookId, status: 'DELIVERED' },
+    select: { grandTotal: true, createdAt: true },
+  });
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekly = [0, 0, 0, 0, 0, 0, 0]; // index 6 = today, 0 = 6 days ago
+  let todayEarned = 0;
+  let todayOrders = 0;
+  for (const o of delivered) {
+    const d = new Date(o.createdAt);
+    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diff = Math.floor((startOfToday.getTime() - dayStart.getTime()) / 86400000);
+    if (diff === 0) {
+      todayEarned += o.grandTotal;
+      todayOrders++;
+    }
+    if (diff >= 0 && diff < 7) weekly[6 - diff] += o.grandTotal;
+  }
+  return {
+    todayEarned: Math.round(todayEarned),
+    todayOrders,
+    avgOrder: todayOrders > 0 ? Math.round(todayEarned / todayOrders) : 0,
+    weekly: weekly.map((n) => Math.round(n)),
+    totalDelivered: delivered.length,
+    todayIdx: 6,
+  };
 }
 
 export async function getKitchenOrder(cookId: string, id: string) {

@@ -136,6 +136,15 @@ export async function updateFcmToken(id: string, data: any): Promise<any> {
   return parseCook(updated);
 }
 
+/** Open/close the kitchen for new orders. */
+export async function setAcceptingOrders(id: string, accepting: boolean): Promise<any> {
+  const updated = await prisma.cook.update({
+    where: { id },
+    data: { acceptingOrders: accepting },
+  });
+  return parseCook(updated);
+}
+
 /** Remove a single device token (used on logout from that device). */
 export async function removeFcmToken(id: string, fcmToken: string): Promise<any> {
   const cook = await prisma.cook.findUnique({ where: { id } });
