@@ -72,6 +72,7 @@ model PlatformConfig {
   payoutCycle           String   @default("Weekly · Friday 6 PM IST")
   minimumPayout         Float    @default(500.0)
   bankRail              String   @default("UPI · NEFT fallback")
+  activeCities          Json     @default("[]")   // [{ name, lat, lng, formattedAddress?, radius?, type? }]
   updatedAt             DateTime @updatedAt
 }
 

@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 
 const DEFAULT_CONFIG = {
@@ -15,7 +16,8 @@ const DEFAULT_CONFIG = {
   pickupRadiusKm: 25,
   payoutCycle: 'Weekly · Friday 6 PM IST',
   minimumPayout: 500,
-  bankRail: 'UPI · NEFT fallback'
+  bankRail: 'UPI · NEFT fallback',
+  activeCities: [] as Prisma.InputJsonValue
 };
 
 export const getOrCreatePlatformConfig = async () => {
@@ -30,12 +32,36 @@ export const getOrCreatePlatformConfig = async () => {
   return config;
 };
 
-export const updatePlatformConfig = async (updates: Partial<typeof DEFAULT_CONFIG>) => {
+// Columns that clients are allowed to update. Anything else in the request
+// body (e.g. `activeCities` sent by the admin UI) is ignored so a stray field
+// can't make Prisma reject the whole update.
+const UPDATABLE_FIELDS = [
+  'platformCommission',
+  'customerDeliveryFee',
+  'cookSignupBonus',
+  'platformFee',
+  'privacyPolicyUrl',
+  'termsAndConditionUrl',
+  'defaultStateRadius',
+  'defaultCityRadius',
+  'defaultVillageRadius',
+  'deliveryRadiusKm',
+  'pickupRadiusKm',
+  'payoutCycle',
+  'minimumPayout',
+  'bankRail',
+  'activeCities',
+] as const;
+
+export const updatePlatformConfig = async (updates: Record<string, unknown>) => {
   // Ensure config exists before updating
   await getOrCreatePlatformConfig();
-  
-  // Exclude ID from updates just in case
-  const { id, ...validUpdates } = updates;
+
+  // Whitelist only known columns; drop id, updatedAt, and any unknown fields.
+  const validUpdates: Record<string, unknown> = {};
+  for (const key of UPDATABLE_FIELDS) {
+    if (updates[key] !== undefined) validUpdates[key] = updates[key];
+  }
 
   return prisma.platformConfig.update({
     where: { id: 'default' },

@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 
 const normalize = (p: string) => p.replace(/\D/g, '');
@@ -74,9 +75,51 @@ export async function deleteUser(id: string) {
   return prisma.user.delete({ where: { id } });
 }
 
-/** All customers, newest first (for the admin panel). */
-export async function listAllUsers() {
-  return prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
+/**
+ * Paginated + searchable customer list for the admin panel.
+ * Search matches name / email / phone (server-side; no client filtering).
+ */
+export async function listAllUsers(opts: { search?: string; page?: number; limit?: number } = {}) {
+  const page = Math.max(1, opts.page ?? 1);
+  const limit = Math.min(100, Math.max(1, opts.limit ?? 20));
+  const search = (opts.search ?? '').trim();
+
+  const where: Prisma.UserWhereInput = search
+    ? {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { phone: { contains: search } },
+        ],
+      }
+    : {};
+
+  const [data, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.user.count({ where }),
+  ]);
+
+  return { data, total, page, limit };
+}
+
+/** Aggregate customer counts for the admin summary tiles (whole dataset). */
+export async function userStats() {
+  const [total, withEmail, blocked] = await Promise.all([
+    prisma.user.count(),
+    prisma.user.count({ where: { NOT: { email: null } } }),
+    prisma.user.count({ where: { status: 'Blocked' } }),
+  ]);
+  return { total, withEmail, active: total - blocked, blocked };
+}
+
+/** Block or unblock a customer. */
+export async function setUserStatus(id: string, status: 'Active' | 'Blocked') {
+  return prisma.user.update({ where: { id }, data: { status } });
 }
 
 export async function countUsers() {

@@ -3,6 +3,8 @@ import {
   getDashboardStats,
   getPendingCooks,
   getUsers,
+  updateUserStatus,
+  getOrders,
   verifyCook,
   runPayoutCycle,
   adminLogin,
@@ -33,6 +35,12 @@ router.get('/cooks/pending', getPendingCooks);
 // Customers (User table)
 router.get('/users', getUsers);
 router.get('/admin/users', getUsers);
+router.patch('/users/:id/status', updateUserStatus);
+router.patch('/admin/users/:id/status', updateUserStatus);
+
+// Orders (cross-kitchen ledger)
+router.get('/orders', getOrders);
+router.get('/admin/orders', getOrders);
 router.post('/cooks/:id/verify', verifyCook);
 router.post('/payouts/run', runPayoutCycle);
 

@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import * as cartService from './cartService';
 import * as addressService from './addressService';
@@ -320,4 +321,80 @@ export async function updateKitchenStatus(cookId: string, id: string, target: st
   if (to < 0) throw new OrderError(400, 'Invalid status.');
   if (to <= from) throw new OrderError(400, 'Order status can only move forward.');
   return prisma.order.update({ where: { id }, data: { status: target }, include: { items: true } });
+}
+
+// ─── Admin: cross-kitchen order ledger ───────────────────────────────────────
+
+/**
+ * All orders across every kitchen for the admin Orders page.
+ * Server-side status filter + search (order id / kitchen / customer) + pagination.
+ */
+export async function listAllOrders(opts: { status?: string; search?: string; page?: number; limit?: number } = {}) {
+  const page = Math.max(1, opts.page ?? 1);
+  const limit = Math.min(100, Math.max(1, opts.limit ?? 20));
+  const search = (opts.search ?? '').trim();
+  const status = (opts.status ?? '').trim();
+
+  const and: Prisma.OrderWhereInput[] = [];
+  if (status) and.push({ status });
+  if (search) {
+    and.push({
+      OR: [
+        { id: { contains: search, mode: 'insensitive' } },
+        { kitchenName: { contains: search, mode: 'insensitive' } },
+        { receiverName: { contains: search, mode: 'insensitive' } },
+        { receiverPhone: { contains: search } },
+      ],
+    });
+  }
+  const where: Prisma.OrderWhereInput = and.length ? { AND: and } : {};
+
+  const [orders, total] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+      include: { items: true },
+    }),
+    prisma.order.count({ where }),
+  ]);
+
+  // Resolve account-holder names for display (order stores only receiver snapshot).
+  const userIds = [...new Set(orders.map((o) => o.userId))];
+  const users = userIds.length
+    ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, phone: true } })
+    : [];
+  const userMap = new Map(users.map((u) => [u.id, u]));
+
+  const data = orders.map((o) => ({
+    id: o.id,
+    customer: o.receiverName || userMap.get(o.userId)?.name || 'Customer',
+    phone: o.receiverPhone || userMap.get(o.userId)?.phone || null,
+    kitchen: o.kitchenName || '—',
+    items: o.items.reduce((s, it) => s + it.qty, 0),
+    total: o.grandTotal,
+    payment: o.paymentStatus,
+    fulfillment: o.fulfillment,
+    status: o.status,
+    createdAt: o.createdAt,
+  }));
+
+  return { data, total, page, limit };
+}
+
+/** Summary tiles for the admin Orders page. */
+export async function adminOrderStats() {
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [revenueAgg, live, refunds] = await Promise.all([
+    prisma.order.aggregate({
+      _sum: { grandTotal: true },
+      where: { status: { notIn: ['CANCELLED', 'PAYMENT_FAILED', 'REFUNDED', 'PENDING_PAYMENT'] } },
+    }),
+    prisma.order.count({
+      where: { status: { in: ['PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'] } },
+    }),
+    prisma.order.count({ where: { status: 'REFUNDED', updatedAt: { gte: dayAgo } } }),
+  ]);
+  return { revenue: revenueAgg._sum.grandTotal ?? 0, live, refunds };
 }

@@ -4,6 +4,7 @@ import * as configService from '../../services/configService';
 import * as couponService from '../../services/couponService';
 import * as cuisineService from '../../services/cuisineService';
 import * as userService from '../../services/userService';
+import * as orderService from '../../services/orderService';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../../config';
 
@@ -60,11 +61,68 @@ export const getPendingCooks = async (_req: Request, res: Response, next: NextFu
   }
 };
 
-/** List all customers (User table) for the admin Customers page */
-export const getUsers = async (_req: Request, res: Response, next: NextFunction) => {
+/** List customers (User table) for the admin Customers page — server-side search + pagination */
+export const getUsers = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const users = await userService.listAllUsers();
-    return res.json({ success: true, data: users });
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    const page = req.query.page ? parseInt(String(req.query.page), 10) : 1;
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 20;
+
+    const [result, stats] = await Promise.all([
+      userService.listAllUsers({ search, page, limit }),
+      userService.userStats(),
+    ]);
+
+    return res.json({
+      success: true,
+      data: result.data,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      stats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** Cross-kitchen order ledger for the admin Orders page — search + filter + pagination */
+export const getOrders = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const page = req.query.page ? parseInt(String(req.query.page), 10) : 1;
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 20;
+
+    const [result, stats] = await Promise.all([
+      orderService.listAllOrders({ search, status, page, limit }),
+      orderService.adminOrderStats(),
+    ]);
+
+    return res.json({
+      success: true,
+      data: result.data,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      stats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** Block or unblock a customer from the admin Customers page */
+export const updateUserStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const raw = String(req.body?.status ?? '');
+    const status = raw === 'Blocked' ? 'Blocked' : raw === 'Active' ? 'Active' : null;
+    if (!status) {
+      return res.status(400).json({ success: false, message: 'status must be "Active" or "Blocked"' });
+    }
+    const updated = await userService.setUserStatus(id, status);
+    return res.json({ success: true, data: updated });
   } catch (error) {
     next(error);
   }
