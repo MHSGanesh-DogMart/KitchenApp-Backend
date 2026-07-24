@@ -141,7 +141,11 @@ export const getCookById = async (req: Request, res: Response, next: NextFunctio
 export const verifyCook = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
-    const updated = await cookService.verifyCook(id);
+    const { approve, reason } = req.body;
+    if (approve === false && !reason) {
+      return res.status(400).json({ success: false, message: 'A rejection reason is required' });
+    }
+    const updated = await cookService.verifyCook(id, approve !== false, reason);
     return res.json({ success: true, data: updated });
   } catch (error) {
     next(error);

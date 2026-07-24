@@ -14,6 +14,7 @@ model Cook {
   phone            String    @unique
   tier             Int       @default(1)
   status           String    @default("Kitchen_Pending")
+  rejectionReason  String?
   dob              String?
   whatsapp         String?
   altContact       String?

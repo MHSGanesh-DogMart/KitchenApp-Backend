@@ -84,11 +84,13 @@ export async function getPendingCooks(): Promise<any[]> {
   return cooks.map(parseCook);
 }
 
-/** Verify a cook */
-export async function verifyCook(id: string): Promise<any> {
+/** Approve or reject a cook's application. */
+export async function verifyCook(id: string, approve: boolean, reason?: string): Promise<any> {
   const updated = await prisma.cook.update({
     where: { id },
-    data: { status: 'Verified' },
+    data: approve
+      ? { status: 'Verified', rejectionReason: null }
+      : { status: 'Kitchen_Rejected', rejectionReason: reason ?? null },
   });
   return parseCook(updated);
 }

@@ -84,15 +84,19 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
 
 /** Submit onboarding registration for a new cook */
 export const submitOnboarding = async (req: Request, res: Response, next: NextFunction) => {
+  console.log('[submitOnboarding] incoming body keys:', Object.keys(req.body));
+  console.log('[submitOnboarding] incoming body:', JSON.stringify(req.body));
   try {
     const { phone, name } = req.body;
     if (!phone || !name) {
+      console.log('[submitOnboarding] rejected: missing phone or name');
       return res.status(400).json({ success: false, message: 'Name and Phone number are required' });
     }
 
     // Check if cook already exists to prevent duplicate onboarding
     let cook = await cookService.findCookByPhone(phone);
     if (cook) {
+      console.log('[submitOnboarding] rejected: cook already exists for phone', phone);
       return res.status(400).json({ success: false, message: 'Chef is already registered with this phone number' });
     }
 
@@ -103,6 +107,7 @@ export const submitOnboarding = async (req: Request, res: Response, next: NextFu
     };
 
     cook = await cookService.createCook(payload);
+    console.log('[submitOnboarding] cook created:', cook.id);
     const token = generateToken(cook.id, 'kitchen');
 
     return res.status(200).json({
@@ -115,6 +120,7 @@ export const submitOnboarding = async (req: Request, res: Response, next: NextFu
       }
     });
   } catch (error) {
+    console.error('[submitOnboarding] FAILED:', error);
     next(error);
   }
 };
