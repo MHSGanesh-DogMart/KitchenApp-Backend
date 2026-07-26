@@ -182,6 +182,24 @@ export const reapplyOnboarding = async (req: Request, res: Response, next: NextF
   }
 };
 
+/** Partial update of the authenticated cook's own profile (per-section edits) */
+export const updateProfile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const cookId = (req as any).user?.id;
+    if (!cookId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+    const updated = await cookService.updateProfile(cookId, req.body);
+    return res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: { cook: updated },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /** Upload image/document attachment → Firebase Storage */
 export const upload = (req: Request, res: Response, next: NextFunction) => {
   multerUpload(req, res, async (err) => {

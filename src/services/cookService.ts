@@ -112,6 +112,33 @@ export async function createCook(data: any): Promise<any> {
   return parseCook(created);
 }
 
+/** Fields a cook may edit about their own profile from the app (excludes
+ * phone/tier/status/verification-controlled fields). */
+const EDITABLE_PROFILE_FIELDS = [
+  'name', 'kitchenName', 'about', 'dob', 'whatsapp', 'altContact',
+  'aadhaarNo', 'panNo', 'isVegOnly', 'hasExistingFssai', 'fssaiNumber', 'fssaiExpiry',
+  'lat', 'lng', 'serviceRadiusKm', 'meals', 'capacity', 'cutoffNotice', 'weeklyOff',
+  'cuisines', 'packagingType', 'deliveryMode', 'address', 'streetAddress', 'landmark',
+  'city', 'state', 'pincode',
+  'selfieUrl', 'bannerUrl', 'aadhaarUrl', 'panUrl', 'fssaiUrl', 'cookingUrl', 'storageUrl', 'sinkUrl',
+] as const;
+
+/** Partial update of the cook's own profile — only whitelisted fields, JSON
+ * arrays re-encoded the same way createCook/upsertCook already do. */
+export async function updateProfile(id: string, data: any): Promise<any> {
+  const patch: Record<string, any> = {};
+  for (const key of EDITABLE_PROFILE_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
+      patch[key] = data[key];
+    }
+  }
+  if (patch.meals && typeof patch.meals !== 'string') patch.meals = JSON.stringify(patch.meals);
+  if (patch.weeklyOff && typeof patch.weeklyOff !== 'string') patch.weeklyOff = JSON.stringify(patch.weeklyOff);
+  if (patch.cuisines && typeof patch.cuisines !== 'string') patch.cuisines = JSON.stringify(patch.cuisines);
+  const updated = await prisma.cook.update({ where: { id }, data: patch });
+  return parseCook(updated);
+}
+
 /** Update FSSAI details */
 export async function updateFssai(id: string, data: { fssaiNumber?: string; fssaiExpiry?: string }): Promise<any> {
   const updated = await prisma.cook.update({

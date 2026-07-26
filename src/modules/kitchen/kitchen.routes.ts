@@ -15,6 +15,7 @@ router.get('/kitchen/cuisines', kitchenCtrl.getCuisines);
 
 // --- Protected Endpoints (Token Verification Required) ---
 router.get('/kitchen/details', verifyToken, kitchenCtrl.getKitchenDetails);
+router.patch('/kitchen/profile', verifyToken, kitchenCtrl.updateProfile);
 router.post('/kitchen/reapply', verifyToken, kitchenCtrl.reapplyOnboarding);
 router.get('/kitchen/status', verifyToken, kitchenCtrl.getKitchenStatus);
 router.post('/kitchen/fcm-token', verifyToken, kitchenCtrl.updateFcmToken);
